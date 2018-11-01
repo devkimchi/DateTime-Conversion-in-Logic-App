@@ -1,0 +1,98 @@
+$schema: http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#
+contentVersion: 1.0.0.0
+parameters:
+  location:
+    type: string
+    metadata:
+      description: Location for Logic App.
+    defaultValue: "[resourceGroup().location]"
+  logicAppName:
+    type: string
+    metadata:
+      description: The name of the Logic App.
+variables:
+  logicApp:
+    name: "[parameters('logicAppName')]"
+    apiVersion: "[providers('Microsoft.Logic', 'workflows').apiVersions[0]]"
+    location: "[parameters('location')]"
+  tags:
+    author: Justin Yoo
+    profile: https://twitter.com/justinchronicle
+    projectUrl: https://github.com/devkimchi/DateTime-Conversions-in-Logic-App
+    repositoryUrl: https://github.com/devkimchi/DateTime-Conversions-in-Logic-App
+    license: https://raw.githubusercontent.com/devkimchi/DateTime-Conversions-in-Logic-App/master/LICENSE
+resources:
+- comments: "### RESOURCE - LOGIC APP ###"
+  type: Microsoft.Logic/workflows
+  apiVersion: "[variables('logicApp').apiVersion]"
+  location: "[variables('logicApp').location]"
+  name: "[variables('logicApp').name]"
+  tags: "[variables('tags')]"
+  properties:
+    parameters: {}
+    definition:
+      $schema: http://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#
+      contentVersion: 1.0.0.0
+      parameters: {}
+      triggers:
+        manual:
+          type: Request
+          kind: Http
+          inputs:
+            schema:
+              timestamp:
+                type: string
+      actions:
+        InitialiseTimestamp:
+          description: Initialises the timestamp value. If request payload is null, it is instantiated with uctNow().
+          type: InitializeVariable
+          runAfter: {}
+          inputs:
+            variables:
+            - type: string
+              name: Timestamp
+              value: "@coalesce(triggerBody()?.timestamp, utcNow())"
+        Get1970TimestampInTicks:
+          description: Gets the timestamp value on 1970-01-01T00:00:00Z in ticks.
+          type: Compose
+          runAfter:
+            InitialiseTimestamp:
+            - Succeeded
+          inputs:
+            ticks: "@ticks('1970-01-01T00:00:00Z')"
+        GetTimestampInTicks:
+          description: Gets the timestamp value in ticks.
+          type: Compose
+          runAfter:
+            InitialiseTimestamp:
+            - Succeeded
+          inputs:
+            ticks: "@ticks(variables('Timestamp'))"
+        GetTimestampInEpoch:
+          description: Gets the timestamp value on 1970-01-01T00:00:00Z in epoch.
+          type: Compose
+          runAfter:
+            GetTimestampInTicks:
+            - Succeeded
+            Get1970TimestampInTicks:
+            - Succeeded
+          inputs:
+            epoch: "@div(sub(outputs('GetTimestampInTicks').ticks, outputs('Get1970TimestampInTicks').ticks), 10000000)"
+        ConvertTicksToTimestamp:
+          description: Converts tick value to timestamp in ISO8601 format
+          type: Compose
+          runAfter:
+            GetTimestampInEpoch:
+            - Succeeded
+          inputs:
+            timestamp: "@addToTime('1970-01-01T00:00:00Z', div(sub(outputs('GetTimestampInTicks').ticks, outputs('Get1970TimestampInTicks').ticks), 10000000), 'Second')"
+        ConvertEpochToTimestamp:
+          description: Converts epoch value to timestamp in ISO8601 format
+          type: Compose
+          runAfter:
+            GetTimestampInEpoch:
+            - Succeeded
+          inputs:
+            timestamp: "@addToTime('1970-01-01T00:00:00Z', outputs('GetTimestampInEpoch').epoch, 'Second')"
+      outputs: {}
+outputs: {}
