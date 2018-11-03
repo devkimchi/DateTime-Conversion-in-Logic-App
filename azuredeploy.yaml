@@ -95,5 +95,20 @@ resources:
             - Succeeded
           inputs:
             timestamp: "@addToTime('1970-01-01T00:00:00Z', outputs('GetTimestampInEpoch').epoch, 'Second')"
+        Response:
+          type: Response
+          kind: Http
+          runAfter:
+            ConvertTicksToTimestamp:
+            - Succeeded
+            ConvertEpochToTimestamp:
+            - Succeeded
+          inputs:
+            statusCode: 200
+            body:
+              ticks: "@outputs('GetTimestampInTicks').ticks"
+              epoch: "@outputs('GetTimestampInEpoch').epoch"
+              ticksToTimestamp: "@outputs('ConvertTicksToTimestamp').timestamp"
+              epochToTimestamp: "@outputs('ConvertEpochToTimestamp').timestamp"
       outputs: {}
 outputs: {}
